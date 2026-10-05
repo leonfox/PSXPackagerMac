@@ -1,0 +1,50 @@
+name: Release
+
+# Push a tag like v1.7.0 to build the app and publish it as a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest Xcode on the runner
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          swift --version
+
+      - name: Build (Apple Silicon + Intel)
+        run: UNIVERSAL=1 ZIP=1 ./build_app.sh
+
+      - name: Check the build
+        run: |
+          lipo -info build/PSXPackager.app/Contents/MacOS/PSXPackagerGUI
+          build/PSXPackager.app/Contents/Helpers/psxpackager --version
+          codesign --verify --deep --strict build/PSXPackager.app
+          ! grep -rlaE "/Users/" build/PSXPackager.app
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          SHA=$(shasum -a 256 build/PSXPackager-macOS.zip | cut -d' ' -f1)
+          sed "s/{{SHA256}}/$SHA/" .github/release-notes.md > notes.md
+          gh release create "$TAG" build/PSXPackager-macOS.zip \
+            --title "PSXPackager for macOS ${TAG#v}" --notes-file notes.md
+
+      - name: Upload build (manual runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSXPackager-macOS
+          path: build/PSXPackager-macOS.zip
