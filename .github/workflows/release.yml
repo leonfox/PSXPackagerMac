@@ -1,8 +1,11 @@
 name: Release
 
-# Push a tag like v1.7.0 to build the app and publish it as a GitHub release.
+# Push to the "release" branch (or push a tag like v1.7.0) to build the app and publish it
+# as a GitHub release. The version comes from Sources/PSXCore/Version.swift; a version that
+# already has a release is skipped.
 on:
   push:
+    branches: [release]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -32,18 +35,22 @@ jobs:
           ! grep -rlaE "/Users/" build/PSXPackager.app
 
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
+          VERSION=$(build/PSXPackager.app/Contents/Helpers/psxpackager --version | head -1 | awk '{print $NF}')
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; bump the version in Sources/PSXCore/Version.swift to publish a new one."
+            exit 0
+          fi
           SHA=$(shasum -a 256 build/PSXPackager-macOS.zip | cut -d' ' -f1)
           sed "s/{{SHA256}}/$SHA/" .github/release-notes.md > notes.md
-          gh release create "$TAG" build/PSXPackager-macOS.zip \
-            --title "PSXPackager for macOS ${TAG#v}" --notes-file notes.md
+          gh release create "$TAG" build/PSXPackager-macOS.zip --target "$GITHUB_SHA" \
+            --title "PSXPackager for macOS $VERSION" --notes-file notes.md
 
-      - name: Upload build (manual runs)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: PSXPackager-macOS
