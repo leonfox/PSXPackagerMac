@@ -1,0 +1,5 @@
+module CHelpers {
+    header "CHelpers.h"
+    link "z"
+    export *
+}

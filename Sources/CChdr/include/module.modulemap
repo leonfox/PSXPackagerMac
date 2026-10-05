@@ -1,0 +1,5 @@
+module CChdr {
+    header "CChdr.h"
+    link "z"
+    export *
+}

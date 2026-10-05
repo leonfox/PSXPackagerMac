@@ -1,0 +1,4 @@
+module CShine {
+    header "shine_layer3.h"
+    export *
+}
