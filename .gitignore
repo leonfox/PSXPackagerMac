@@ -1,0 +1,8 @@
+.build/
+build/
+.swiftpm/
+.tools/
+.test/
+.claude-task/
+.DS_Store
+dev-runner.sh
